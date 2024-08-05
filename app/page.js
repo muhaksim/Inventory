@@ -10,6 +10,7 @@ export default function Home() {
   const [inventory, setInventory] = useState([])
   const [open, setOpen] = useState(false)
   const [itemName, setItemName] = useState('')
+  const [itemQuantity, setItemQuantity] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
 
   const updateInventory = async () => {
@@ -22,15 +23,15 @@ export default function Home() {
     setInventory(inventoryList)
   }
 
-  const addItem = async (item) => {
+  const addItem = async (item, quantity) => {
     const docRef = doc(firestore, 'inventory', item)
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
-      const { quantity } = docSnap.data()
-      await setDoc(docRef, {quantity: quantity + 1})
+      const { quantity : existingQuantity } = docSnap.data()
+      await setDoc(docRef, {quantity: existingQuantity + quantity})
     } else {
-      await setDoc(docRef, {quantity: 1})
+      await setDoc(docRef, {quantity: quantity})
     }
     await updateInventory()
   }
@@ -51,6 +52,16 @@ export default function Home() {
     await updateInventory()
   }
 
+  const deleteItem = async (item) => {
+    const docRef = doc(firestore, 'inventory', item)
+    const docSnap = await getDoc(docRef)
+
+    if (docSnap.exists()) {
+      await deleteDoc(docRef)
+    }
+    await updateInventory()
+  }
+
   const filteredInventory = inventory.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -64,17 +75,19 @@ export default function Home() {
   }, [])
   
   return (
-    <Box width="100vw" height="100vh" display="flex" flexDirection="column" justifyContent="center" alignItems="center" gap={2}>
+    <Box width="100vw" height="100vh" display="flex" flexDirection="column" justifyContent="center" alignItems="center" gap={2} bgcolor="rgb(192, 193, 194)">
       <Modal open={open} onClose={handleClose}>
         <Box position="absolute" top="50%" left="50%" width={400} bgcolor="white" border="2px solid #000" boxShadow={24} p={4} display="flex" flexDirection="column" gap={3} sx={{transform:"translate(-50%, -50%)"}}>
           <Typography variant="h6">Add Item</Typography>
           <Stack width="100%" direction="row" spacing={2}>
-            <TextField variant="outlined" fullWidth value={itemName} onChange={(e) => { 
+            <TextField variant="outlined" fullWidth value={itemName} placeholder="Item Name" onChange={(e) => { 
               setItemName(e.target.value)
             }} />
+            <TextField variant="outlined" fullWidth type="number" value={itemQuantity} onChange={(e) => setItemQuantity(parseInt(e.target.value))} placeholder="Quantity"/>
             <Button variant="outlined" onClick={() => {
-              addItem(itemName)
+              addItem(itemName, itemQuantity)
               setItemName('')
+              setItemQuantity(1)
               handleClose()
             }}>Add</Button>
           </Stack>
@@ -92,7 +105,7 @@ export default function Home() {
       />
       <Box border="1px solid #333">
         <Box width="800px" height="100px" bgcolor="#ADD8E6" display="flex" justifyContent="center" alignItems="center">
-          <Typography variant="h2" color="#453">Inventory Item</Typography>
+          <Typography variant="h2" color="#16E">Inventory Items</Typography>
         </Box>
       </Box>
       <Stack width="800px" height="300px" spacing={2} overflow="auto">
@@ -101,12 +114,17 @@ export default function Home() {
             <Typography variant="h3" color="#333" textAlign="center">{name.charAt(0).toUpperCase() + name.slice(1)}</Typography>
             <Typography variant="h3" color="#333" textAlign="center">{quantity}</Typography>
             <Stack direction="row" spacing={2}>
+              <TextField type="number" variant="outlined" size="small" defaultValue={1} inputProps={{min: 1}} style={{width: '80px'}} id={`quantity-${name}`} />
               <Button variant="contained" onClick={() => {
-                addItem(name)
+                const quantityToAdd = Math.max(1, parseInt(document.getElementById(`quantity-${name}`).value) || 1)
+                addItem(name, quantityToAdd)
               }}>Add</Button>
               <Button variant="contained" onClick={() => {
                 removeItem(name)
               }}>Remove</Button>
+              <Button variant="contained" color="error" onClick={() => {
+                deleteItem(name)
+              }}>Delete</Button>
             </Stack>
           </Box>
         ))}
